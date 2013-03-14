@@ -3,6 +3,7 @@
 # Author: Samuel Sekiwere <sekiskylink@gmail.com>
 
 import os
+import sys
 import web
 import urllib
 import httplib
@@ -15,6 +16,9 @@ from datetime import timedelta
 from urllib import urlencode
 from urllib import urlopen
 from web.contrib.template import render_mako
+
+filedir = os.path.dirname(__file__)
+sys.path.append(os.path.join(filedir))
 from pagination import *
 
 class AppURLopener(urllib.FancyURLopener):
@@ -220,7 +224,7 @@ def log_to_stats_matrix(dbconn,msg_dict):
     r = dbconn.query(query % msg_dict)
     if r:
         idx = r[0]['id']
-        db.query("UPDATE statistics SET sent_count= sent_count + 1 WHERE id = %r"%idx)
+        db.query("UPDATE statistics SET sent_count= sent_count + 1 WHERE id = %s"%idx)
     else:
         dbconn.insert('statistics', idate=msg_dict['idate'], backend_id=msg_dict['backend_id'],
                 destination=msg_dict['destination'])
@@ -434,7 +438,7 @@ class CheckModems:
             x = f.readlines()
         except IOError, (instance):
             logging.debug("[%s] Checked status: perhaps kannel is down!"%('/check'))
-            return "Kannel is likely to be down! Sam is your friend now!"
+            return "Kannel is likely to be down!"
         p = x[:]
 
         y = GetBackends(db, 'm', True)
@@ -581,7 +585,7 @@ class Reports:
         dic = lit(relations='message_view', fields="*", criteria="", limit=limit,offset=start)
         res = doquery(db,dic)
         count = countquery(db, dic)
-        pagination_str = getPaginationString(default(page,0),count,limit,2,"/reports","?page=")
+        pagination_str = getPaginationString(default(page,0),count,limit,2,"reports","?page=")
 
         l = locals(); del l['self']
         return render.reports(**l)
