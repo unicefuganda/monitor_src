@@ -123,47 +123,47 @@ INSERT INTO shortcode_allowed_modems (shortcode_id, allowedlist)
 VALUES
     ((SELECT id FROM backends WHERE name='dmark6767'),
         ARRAY[
-            (SELECT id FROM backends WHERE name = 'mtn-modem'),
-            (SELECT id FROM backends WHERE name = 'warid-modem'),
-            (SELECT id FROM backends WHERE name = 'orange-modem')
+            (SELECT id FROM backends WHERE smsc_name = 'mtn-modem'),
+            (SELECT id FROM backends WHERE smsc_name = 'warid-modem'),
+            (SELECT id FROM backends WHERE smsc_name = 'orange-modem')
         ]),
     ((SELECT id FROM backends WHERE name='dmark8500'),
         ARRAY[
-            (SELECT id FROM backends WHERE name = 'mtn-modem'),
-            (SELECT id FROM backends WHERE name = 'warid-modem'),
-            (SELECT id FROM backends WHERE name = 'orange-modem')
+            (SELECT id FROM backends WHERE smsc_name = 'mtn-modem'),
+            (SELECT id FROM backends WHERE smsc_name = 'warid-modem'),
+            (SELECT id FROM backends WHERE smsc_name = 'orange-modem')
         ]),
      ((SELECT id FROM backends WHERE name='yo6200'),
         ARRAY[
-            (SELECT id FROM backends WHERE name = 'mtn-modem'),
-            (SELECT id FROM backends WHERE name = 'warid-modem'),
-            (SELECT id FROM backends WHERE name = 'utl-modem'),
-            (SELECT id FROM backends WHERE name = 'orange-modem')
+            (SELECT id FROM backends WHERE smsc_name = 'mtn-modem'),
+            (SELECT id FROM backends WHERE smsc_name = 'warid-modem'),
+            (SELECT id FROM backends WHERE smsc_name = 'utl-modem'),
+            (SELECT id FROM backends WHERE smsc_name = 'orange-modem')
         ]),
      ((SELECT id FROM backends WHERE name='yo8200'),
         ARRAY[
-            (SELECT id FROM backends WHERE name = 'mtn-modem'),
-            (SELECT id FROM backends WHERE name = 'warid-modem'),
-            (SELECT id FROM backends WHERE name = 'orange-modem')
+            (SELECT id FROM backends WHERE smsc_name = 'mtn-modem'),
+            (SELECT id FROM backends WHERE smsc_name = 'warid-modem'),
+            (SELECT id FROM backends WHERE smsc_name = 'orange-modem')
         ]),
     ((SELECT id FROM backends WHERE name='zain6767'),
         ARRAY[
-            (SELECT id FROM backends WHERE name = 'airtel-modem')
+            (SELECT id FROM backends WHERE smsc_name = 'airtel-modem')
         ]
     ),
     ((SELECT id FROM backends WHERE name='zain8500'),
         ARRAY[
-            (SELECT id FROM backends WHERE name = 'airtel-modem')
+            (SELECT id FROM backends WHERE smsc_name = 'airtel-modem')
         ]
     ),
     ((SELECT id FROM backends WHERE name='utl6767'),
         ARRAY[
-            (SELECT id FROM backends WHERE name = 'utl-modem')
+            (SELECT id FROM backends WHERE smsc_name = 'utl-modem')
         ]
     ),
     ((SELECT id FROM backends WHERE name='utl8500'),
         ARRAY[
-            (SELECT id FROM backends WHERE name = 'utl-modem')
+            (SELECT id FROM backends WHERE smsc_name = 'utl-modem')
         ]
     );
 
