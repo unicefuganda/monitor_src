@@ -1,0 +1,93 @@
+<%inherit file="base.html"/>
+<%block name="content">
+    <%self:mylinks>
+        <li><a href="/settings">Settings</a></li>
+    </%self:mylinks>
+    <br/>
+    <div>
+        <h3>Add/Edit User</h3>
+        <form name="" method="post" action="">
+        <table class="list2">
+            <tr>
+                <table class="list2">
+                    <tr>
+                        <td>First Name:</td>
+                        <td><input type="text" name="firstname" id="firstname" value="${ firstname }" class="itext"/></td>
+                    </tr>
+                    <tr>
+                        <td>Last Name:</td>
+                        <td><input type="text" name="lastname" id="lastname" value="${ lastname }" class="itext"/></td>
+                    </tr>
+                    <tr>
+                        <td>Email:</td>
+                        <td><input type="text" name="email" id="email" value="${ email }" class="itext"/></td>
+                    </tr>
+                    <tr>
+                        <td>User Type:</td>
+                        <td>
+                            <select name="utype" id="utype" class="ftext">
+                                <option value="">Select User Type</option>
+                                <option value="admin"
+                                % if utype == 'admin':
+                                    selected="yes"
+                                % endif
+                                    >admin</option>
+                                <option value="manager"
+                                % if utype == 'manager':
+                                    selected="yes"
+                                % endif
+                                    >manager</option>
+                            </select>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Enabled?:</td>
+                        <td><input type="checkbox" name="enabled" id="enabled"
+                                % if enabled == True:
+                                    checked="yes"
+                                % endif
+                                class=""/></td>
+                    </tr>
+                    <tr>
+                        <td></td>
+                        <td><input type="submit" name=""
+                            % if params.ed:
+                                value = "Edit User"
+                            % else:
+                                value="Add User"
+                            % endif
+                            class="button"/>
+                        </td>
+                    </tr>
+                </table>
+            </tr>
+        </table>
+        </form>
+    </div>
+    <table class="list" style="padding-bottom: 0px; margin-bottom:0px; border-bottom:none;
+        background-color:#4069b0;color:ffffff;">
+            <tr><th>Users</th><th></th></tr>
+    </table>
+    <table class="list">
+        <tr><th>Name</th><th>Email</th><th>Type</th><th>Enabled</th><th>Action</th>
+        </tr>
+        % for user in res:
+        <td>${user.firstname} ${user.lastname}</td>
+                <td>${user.email}</td>
+                <td>${user.utype}</td>
+                <td>
+                    % if user.active == True:
+                        Yes
+                    % else:
+                        No
+                    % endif
+                </td>
+                <td>
+                    <a href="?ed=${user.id}"><image src="static/images/edit.png" alt="Edit"/></a>
+                    &nbsp;&nbsp;&nbsp;
+                    <a href="?d_id=${user.id}"><image src="static/images/delete.png" alt="Edit"/></a>
+                </td>
+                </tr>
+        % endfor
+    </table>
+</%block>

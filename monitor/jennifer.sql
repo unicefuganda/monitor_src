@@ -35,7 +35,8 @@ CREATE TABLE messages(
     destination TEXT NOT NULL DEFAULT '',
     status_out TEXT NOT NULL,
     cdate TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    ldate TIMESTAMPTZ
+    ldate TIMESTAMPTZ,
+    server_response_date TIMESTAMPTZ
 );
 
 CREATE TABLE misc(
@@ -101,6 +102,7 @@ VALUES
     ('DEFAULT_EMAIL_SENDER','root@uganda.rapidsms.org','The defaul email sender'),
     ('KANNEL_STATUS_URL','http://localhost:13000/status','The Kannel status URL'),
     ('SENDSMS_URL','http://localhost:13013/cgi-bin/sendsms?username=tester&password=foobar','The Send SMS URL'),
+    ('ADD_RESPONSE_TIME','true','Whether to send back server response time'),
     ('ACTIVATE_MANAGERS','true','Whether to activate managers for email alerts');
 
 INSERT INTO templates(name, en_txt)

@@ -51,12 +51,13 @@ urls = (
         "/check", "CheckModems",
         "/monitor", "MonitorQosMessages",
         "/manage", "DisableEnableBackend",
-        "info", "Info",
+        "/info", "Info",
         "/manage_shortcode", "ManageShortcode",
         "/test", "Test",
         "/reports", "Reports",
         "/logs", "JenniferLog",
         "/stats", "Stats",
+        "/users", "Admin",
         )
 
 #web.config.smtp_server = 'mail.mydomain.com'
@@ -85,6 +86,7 @@ SETTINGS = {
     'KANNEL_STATUS_URL': 'http://localhost:13000/status',
     'LANGUAGE': 'en',
     'PAGE_LIMIT': 15,
+    'ADD_RESPONSE_TIME': 'false', # if server response time is added to response message
     }
 TEMPLATES = {
             'QOS_SEND_SUBJ':'QOS Messages Sent at: ',
@@ -251,9 +253,9 @@ def get_backendlist(l,ret_strlist=True):
     t = ''
     for i in l:
         if ret_strlist:
-            t += "\'%s\',"%(i)
+            t += "\'%s\'," % (i)
         else:
-            t += "%s,"%(i)
+            t += "%s," % (i)
     return t[:-1]
 
 #Page Handlers
@@ -274,20 +276,27 @@ class HandleReceivedQosMessage:
         if params.sender.lower() not in shortcodes:
             return "Ignored, black listed sender!"
         msg = params.message.strip()
-        if not re.match(r'^\d{4}-\d{2}-\d{2}\s\d{2}$', msg):
+        if not re.match(r'^\d{4}-\d{2}-\d{2}\s\d{2}', msg):
             return "Message not in format we want!"
         # Now log message to DB in msg_in
         modems  = GetBackends(db, 'm' ,True).get()
         modem_numbers = [m['identity'] for m in GetBackends(db, 'm', True).get()]
         params.receiver = params.receiver.replace('+','')
         if params.receiver not in modem_numbers:
-            return "Message Ingnored, receiver not one of our modem numbers!"
+            return "Message Ingnored, receiver not one of our modem numbers! (%s)" % params.receiver
         backend_id = [b['id'] for b in modems if b['smsc_name'] == params.backend][0]
-        msg_in = msg
+        if SETTINGS['ADD_RESPONSE_TIME'] == 'true':
+            msg_in = msg.split(',')[0]
+            server_response_time = msg.split(',')[1]
+            resp_str = " server_response_date = '%s' " % server_response_time
+        else:
+            resp_str = ' server_response_date = NULL '
+            msg_in = msg
         with db.transaction():
-            query = ("UPDATE messages SET ldate = '%s', msg_in='%s' WHERE msg_out='%s' AND backend_id = %s AND destination = '%s'"
+            query = ("UPDATE messages SET ldate = '%s', msg_in='%s', %s "
+                    " WHERE msg_out='%s' AND backend_id = %s AND destination = '%s' "
                     "RETURNING round((EXTRACT(EPOCH FROM ldate - cdate))::numeric,3) AS diff, cdate::date as xdate")
-            query = query % (datetime.now(), msg_in, msg, backend_id, params.sender)
+            query = query % (datetime.now(), msg_in, resp_str, msg_in, backend_id, params.sender)
             res = db.query(query)
             #db.update('messages', msg_in=msg_in, ldate=datetime.now(),
             #        where=web.db.sqlwhere({'msg_out':msg, 'backend_id':backend_id, 'destination':params.sender}))
@@ -465,7 +474,7 @@ class DisableEnableBackend:
     def get_backendlist(self,l):
         t = ''
         for i in l:
-            t += "\'%s\',"%(i)
+            t += "\'%s\'," % (i)
         return t[:-1]
 
     def GET(self):
@@ -511,16 +520,16 @@ class ManageShortcode:
             return "No Shortcode specifies, please pass required parameter: shortcode_name"
 
         modem_list = modem_list.split(',')
-        res = db.query("SELECT id FROM backends WHERE name IN (%s)"%get_backendlist(modem_list,True))
+        res = db.query("SELECT id FROM backends WHERE name IN (%s)" % get_backendlist(modem_list,True))
         if not res:
             web.ctx.status = '400 Bad Request'
-            return "Specified modem(s) %s not in our list of modems"%modem_list
-        shortcode = db.query("SELECT id FROM backends WHERE name = '%s' AND btype = 's'"%(shortcode_name))
+            return "Specified modem(s) %s not in our list of modems" % modem_list
+        shortcode = db.query("SELECT id FROM backends WHERE name = '%s' AND btype = 's'" % (shortcode_name))
         if shortcode:
             shortcode_id = shortcode[0]['id']
         else:
             web.ctx.status = '400 Bad Request'
-            return "Unknown Shortcode name %s"%shortcode_name
+            return "Unknown Shortcode name %s" % shortcode_name
         modem_ids = [i['id'] for i in res]
         t_query = ("UPDATE shortcode_allowed_modems SET allowedlist = ARRAY[%s] WHERE shortcode_id = %s")
         db.query(t_query % (get_backendlist(modem_ids,False),shortcode_id))
@@ -589,6 +598,67 @@ class Reports:
 
         l = locals(); del l['self']
         return render.reports(**l)
+
+class Admin:
+    def GET(self):
+        params = web.input(page=1, ed="", d_id="")
+        firstname,lastname,email,enabled, utype = ("", "", "", False, "")
+
+        if params.ed:
+            pass
+            r = db.query("SELECT * FROM users WHERE id = %s"% params.ed)
+            if r:
+                rx = r[0]
+                firstname=rx.firstname; lastname=rx.lastname; email=rx.email; enabled=rx.active
+                utype = rx.utype
+            del r
+        if params.d_id:
+            db.query("DELETE FROM users WHERE id=%s" % params.d_id)
+
+        try:
+            page = int(params.page)
+        except: page = 1
+
+        limit = SETTINGS['PAGE_LIMIT']
+        start = (page -1) * limit if page > 0 else 0
+
+        dic = lit(relations='users', fields="*", criteria="", order="firstname, lastname", limit=limit,offset=start)
+        res = doquery(db,dic)
+        count = countquery(db, dic)
+        pagination_str = getPaginationString(default(page,0),count,limit,2,"users","?page=")
+        l = locals(); del l['self']
+        return render.users(**l)
+
+    def POST(self):
+        params = web.input(page=1, ed="", d_id="",
+                firstname="", lastname="", email="", enabled=False, utype="")
+        firstname,lastname,email,enabled, utype = ("", "", "", False, "")
+
+        with db.transaction():
+            active = True if params.enabled == "on" else False
+            if params.ed:
+                update_sql = ("UPDATE users SET firstname='%s', lastname='%s', email = '%s', "
+                            " utype='%s', active = %s WHERE id = %s ")
+                update_sql = update_sql % (params.firstname, params.lastname, params.email,
+                        params.utype, active, params.ed)
+                db.query(update_sql)
+            elif not params.ed and not params.d_id:
+                #we're inserting
+                pass
+
+        try:
+            page = int(params.page)
+        except: page = 1
+        limit = SETTINGS['PAGE_LIMIT']
+        start = (page -1) * limit if page > 0 else 0
+
+        dic = lit(relations='users', fields="*", criteria="", order="firstname, lastname", limit=limit,offset=start)
+        res = doquery(db,dic)
+        count = countquery(db, dic)
+        pagination_str = getPaginationString(default(page,0),count,limit,2,"users","?page=")
+
+        l = locals(); del l['self']
+        return render.users(**l)
 
 if __name__ == "__main__":
       app.run()
