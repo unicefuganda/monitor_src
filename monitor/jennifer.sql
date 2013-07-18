@@ -196,3 +196,17 @@ CREATE VIEW message_view AS
         b.msg_in, to_char(b.ldate, 'yyyy-mm-dd HH24:MI:SS'::text) AS receive_date, b.destination AS recipient
     FROM backends a, messages b
     WHERE a.id = b.backend_id ORDER BY b.id DESC;
+
+CREATE VIEW rtt_view
+AS
+    SELECT
+        a.backend_id, b.name AS backend, a.msg_out, a.msg_in, a.destination, a.cdate, a.ldate, a.server_response_date,
+        round((EXTRACT(EPOCH FROM a.server_response_date - a.cdate))::numeric,3) AS to_time,
+        round((EXTRACT(EPOCH FROM a.ldate - a.server_response_date))::numeric,3) AS fro_time,
+        round((EXTRACT(EPOCH FROM a.ldate - a.cdate))::numeric,3) AS rtt_time
+    FROM
+        messages a,
+        backends b
+    WHERE
+        a.backend_id = b.id
+    ORDER BY cdate DESC;

@@ -2,4 +2,28 @@
 <%block name="content">
     <%self:mylinks/>
     <br/>
+    <div>
+        <form name="" action="" method="post">
+            <table class="list2">
+                <tr>
+                    <td>Network: <select name="network" id="network" class="ftext">
+                            <option value="">Select Network</option>
+                            <option value="Airtel-modem">Airtel</option>
+                            <option value="MTN">MTN</option>
+                            <option value="Orange">Orange</option>
+                            <option value="UTL">UTL</option>
+                            <option value="Warid">Warid</option>
+                            </select>
+                    </td>
+                    <td></td>
+                </tr>
+            </table>
+        </form>
+    </div>
+    <div id="graph">
+    </div>
+</%block>
+<%block name="myscripts">
+    <script type="text/javascript" src="/static/js/highcharts.js"></script>
+    <script type="text/javascript" src="/static/js/stats.js"></script>
 </%block>

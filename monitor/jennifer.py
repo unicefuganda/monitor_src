@@ -39,7 +39,7 @@ logging.basicConfig( format='%(asctime)s:%(levelname)s:%(message)s', filename='/
 
 #DB confs
 db_host = 'localhost'
-db_name = 'jennifer'
+db_name = 'jennifer2'
 db_user = 'postgres'
 db_passwd = 'postgres'
 
@@ -58,6 +58,7 @@ urls = (
         "/logs", "JenniferLog",
         "/stats", "Stats",
         "/users", "Admin",
+        "/data", "Data",
         )
 
 #web.config.smtp_server = 'mail.mydomain.com'
@@ -659,6 +660,54 @@ class Admin:
 
         l = locals(); del l['self']
         return render.users(**l)
+
+class Data:
+    """
+    The GET method returns a csv format that can be consumed by
+    Highcharts. Given a network it will return the round trip time (Network-Shortcode)
+    for the last 6 hours. Below follows a sample format
+
+    Categories,Apples,Pears,Oranges,Bananas
+    MTN-6767,8,4,6,5
+    MTN-8500,3,4,2,3
+    MTN-8200,86,76,79,77
+    MTN-6200,3,16,13,15
+    """
+    def GET(self):
+        params = web.input(network="UTL")
+        data = {}
+        if params.network:
+            rs = db.query("select a.identity from backends a, shortcode_allowed_modems b "
+                        " where b.shortcode_id = a.id AND (select id from backends where name "
+                        "= '%s') = any(b.allowedlist)" % params.network)
+            for r in rs:
+                data['%s-%s' % (params.network, r.identity)]=['0', '0', '0', '0', '0', '0']
+
+            count_per_hour = len(data.keys())
+
+            now = datetime.now()
+            #now = datetime(2012, 6, 18, 15, 0)
+            categories = []
+            #if now.minute >= 1:
+            t = now
+            for i in range(6): # we can make this 6 configurable
+                categories.append(t.strftime('%Y-%m-%d %H'))
+                t = t - timedelta(hours=1)
+            categories.reverse()
+            #print categories
+            category_list = 'Categories,' + ','.join(categories) + "\n"
+            #print category_list
+            rs = db.query("select * FROM rtt_view WHERE backend = "
+                    "'%s' and cdate > '%s:00' ORDER BY cdate ASC LIMIT %s" % (params.network,
+                        categories[0], (6 * count_per_hour)))
+            for  r in rs:
+                if r.msg_out in categories:
+                    idx = categories.index(r.msg_out)
+                    data['%s-%s' % (params.network, r.destination)][idx] = '%s' % r.rtt_time
+            #print data
+        for key in data.keys():
+            category_list = category_list + key + "," + ",".join(data[key]) + "\n"
+        return category_list
 
 if __name__ == "__main__":
       app.run()
