@@ -1,5 +1,4 @@
 #!/usr/bin/python
-# -*- coding: utf8 -*-
 # Author: Samuel Sekiwere <sekiskylink@gmail.com>
 
 import os
