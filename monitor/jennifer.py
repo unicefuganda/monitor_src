@@ -6,9 +6,7 @@ import os
 import sys
 import web
 import urllib
-import httplib
 import logging
-import psycopg2
 import re
 import time
 from datetime import datetime
@@ -19,23 +17,26 @@ from web.contrib.template import render_mako
 
 filedir = os.path.dirname(__file__)
 sys.path.append(os.path.join(filedir))
-from pagination import *
+from pagination import doquery, getPaginationString, countquery
+
 
 class AppURLopener(urllib.FancyURLopener):
-	version = "QOS /0.1"
+    version = "QOS /0.1"
 
 urllib._urlopener = AppURLopener()
 
 #render = web.template.render('/var/www/qos')
 #render = web.template.render('templates')
 render = render_mako(
-        directories=[os.path.join(os.path.dirname(__file__), 'templates').replace('\\','/'),],
-        input_encoding='utf-8',
-        output_encoding='utf-8',
-        )
+    directories=[os.path.join(os.path.dirname(__file__), 'templates').replace('\\', '/'), ],
+    input_encoding='utf-8',
+    output_encoding='utf-8',
+)
 
-logging.basicConfig( format='%(asctime)s:%(levelname)s:%(message)s', filename='/var/log/jennifer/jennifer.log',
-		datefmt='%Y-%m-%d %I:%M:%S', level=logging.DEBUG)
+logging.basicConfig(
+    format='%(asctime)s:%(levelname)s:%(message)s', filename='/var/log/jennifer/jennifer.log',
+    datefmt='%Y-%m-%d %I:%M:%S', level=logging.DEBUG
+)
 
 #DB confs
 db_host = 'localhost'
@@ -45,21 +46,21 @@ db_passwd = 'postgres'
 
 
 urls = (
-        "/qos", "HandleReceivedQosMessage",
-        "/dlr", "HandleDlr",
-        "/send", "SendQosMessages",
-        "/check", "CheckModems",
-        "/monitor", "MonitorQosMessages",
-        "/manage", "DisableEnableBackend",
-        "/info", "Info",
-        "/manage_shortcode", "ManageShortcode",
-        "/test", "Test",
-        "/reports", "Reports",
-        "/logs", "JenniferLog",
-        "/stats", "Stats",
-        "/users", "Admin",
-        "/data", "Data",
-        )
+    "/qos", "HandleReceivedQosMessage",
+    "/dlr", "HandleDlr",
+    "/send", "SendQosMessages",
+    "/check", "CheckModems",
+    "/monitor", "MonitorQosMessages",
+    "/manage", "DisableEnableBackend",
+    "/info", "Info",
+    "/manage_shortcode", "ManageShortcode",
+    "/test", "Test",
+    "/reports", "Reports",
+    "/logs", "JenniferLog",
+    "/stats", "Stats",
+    "/users", "Admin",
+    "/data", "Data",
+)
 
 #web.config.smtp_server = 'mail.mydomain.com'
 
@@ -69,15 +70,15 @@ db = web.database(
     user=db_user,
     pw=db_passwd,
     db=db_name,
-        host=db_host
-    )
+    host=db_host
+)
 
 QOS_RECIPIENTS = [
-        ('Samuel', 'sekiskylink@gmail.com')
-        ]
+    ('Samuel', 'sekiskylink@gmail.com')
+]
 MODEM_STATUS_RECIPIENTS = [
-        ('Samuel', 'sekiskylink@gmail.com')
-        ]
+    ('Samuel', 'sekiskylink@gmail.com')
+]
 
 RECIEVE_URL = 'http://messenger.unicefuganda.org/router/receive/?password=p73xvyqi&backend=%s&sender=%s&message=%s'
 
@@ -87,55 +88,66 @@ SETTINGS = {
     'KANNEL_STATUS_URL': 'http://localhost:13000/status',
     'LANGUAGE': 'en',
     'PAGE_LIMIT': 15,
-    'ADD_RESPONSE_TIME': 'false', # if server response time is added to response message
-    }
+    'ADD_RESPONSE_TIME': 'false',  # if server response time is added to response message
+}
 TEMPLATES = {
-            'QOS_SEND_SUBJ':'QOS Messages Sent at: ',
-            'QOS_SEND_BODY_LINIE1':'Hi,\nJennifer sent SMS from the following networks:\nSENDER                         | RECIPIENT\n',
-            'QOS_SEND_INNER_BODY':'%s(%s)%s| %s\n',
-            'QOS_RECV_ALL_SUBJ':'QOS Messages Received within:',
-            'QOS_ALARM_SUBJ':'QOS Monitor Alert at: %s',
-            'QOS_RECV_BODY_LINE1':'Hi,\nWoooooow!!!\nJennifer received SMS from all networks:',
-            'QOS_RECV_BODY_LINE2':'----------------------------------------------------\n',
-            'QOS_ALARM_BODY_LINE1':'Hello %s,\nJenifer didn\'t get a reply for the following networks:\n',
-            'QOS_ALARM_INNER_BODY':'%s -Tested with %s(%s)\n',
-            'QOS_FOOTER':'\n\nRegards,\nJennifer',
-            'QOS_TIME_LINE':'Time of Testing: ',
-        }
-QOS_INTERVAL = {'hours':1, 'minutes':0, 'offset':5}
+    'QOS_SEND_SUBJ': 'QOS Messages Sent at: ',
+    'QOS_SEND_BODY_LINIE1': 'Hi,\nJennifer sent SMS from the following networks:\nSENDER                         | RECIPIENT\n',
+    'QOS_SEND_INNER_BODY': '%s(%s)%s| %s\n',
+    'QOS_RECV_ALL_SUBJ': 'QOS Messages Received within:',
+    'QOS_ALARM_SUBJ': 'QOS Monitor Alert at: %s',
+    'QOS_RECV_BODY_LINE1': 'Hi,\nWoooooow!!!\nJennifer received SMS from all networks:',
+    'QOS_RECV_BODY_LINE2': '----------------------------------------------------\n',
+    'QOS_ALARM_BODY_LINE1': 'Hello %s,\nJenifer didn\'t get a reply for the following networks:\n',
+    'QOS_ALARM_INNER_BODY': '%s -Tested with %s(%s)\n',
+    'QOS_FOOTER': '\n\nRegards,\nJennifer',
+    'QOS_TIME_LINE': 'Time of Testing: ',
+}
+QOS_INTERVAL = {'hours': 1, 'minutes': 0, 'offset': 5}
 ## Helper Classes and Functions
+
+
 def lit(**keywords):
     return keywords
 
+
 def default(*args):
-        p = [i for i in args if i or i==0]
-        if p.__len__(): return p[0]
-        if args.__len__(): return args[args.__len__()-1]
+        p = [i for i in args if i or i == 0]
+        if p.__len__():
+            return p[0]
+        if args.__len__():
+            return args[args.__len__() - 1]
         return None
+
 
 class GetBackends(object):
     """Returns backends of a given type"""
-    def __init__(self,db,btype='s',active='t'):
+    def __init__(self, db, btype='s', active='t'):
         self.db = db
         self.backend_type = btype
         self.active = active
+
     def get(self):
         b_query = ("SELECT id,name,identity, smsc_name FROM backends WHERE btype = '%s' AND active = %s")
-        query = b_query %(self.backend_type, self.active)
+        query = b_query % (self.backend_type, self.active)
         backends = self.db.query(query)
         return backends
 
+
 class GetAllowedModems(object):
     """Given a shortcode, return modems allowed to send to shortcode"""
-    def __init__(self,db,shortcode_id):
+    def __init__(self, db, shortcode_id):
         self.db = db
         self.shortcode_id = shortcode_id
+
     def get(self):
-        t_query = ("SELECT id, name, identity, smsc_name, active FROM backends "
-                    "WHERE id IN (SELECT unnest(allowedlist) FROM shortcode_allowed_modems WHERE shortcode_id = %s) AND active = %s")
+        t_query = (
+            "SELECT id, name, identity, smsc_name, active FROM backends "
+            "WHERE id IN (SELECT unnest(allowedlist) FROM shortcode_allowed_modems WHERE shortcode_id = %s) AND active = %s")
         query = t_query % (self.shortcode_id, True)
         res = self.db.query(query)
         return res
+
 
 def IsModemActive(modem_smscname):
     """Checks modem status in Kannel i.e(online, re-connecting,..)"""
@@ -149,53 +161,59 @@ def IsModemActive(modem_smscname):
     for l in p:
         if not l.strip():
             continue
-        pattern = re.compile(r'%s'%modem_smscname)
+        pattern = re.compile(r'%s' % modem_smscname)
         if pattern.match(l.strip()):
-            status = l.strip().split()[2].replace('(','')
+            status = l.strip().split()[2].replace('(', '')
     return True if status == 'online' else False
+
 
 class Settings(object):
     """Load settings from misc table in DB"""
-    def __init__(self,db):
+    def __init__(self, db):
         self.db = db
         self.get_all_setting()
         self.get_email_recipients()
         self.get_templates()
+
     def get_all_setting(self):
         global SETTINGS
         res = self.db.query("SELECT item,val FROM misc")
         if res:
             for setting in res:
-                SETTINGS['%s'%setting['item']] = setting['val']
+                SETTINGS['%s' % setting['item']] = setting['val']
+
     def get_email_recipients(self):
         global QOS_RECIPIENTS, SETTINGS
-        res = self.db.query("SELECT firstname, email, utype FROM users WHERE active = %s"%True)
+        res = self.db.query("SELECT firstname, email, utype FROM users WHERE active = %s" % True)
         if res:
             for r in res:
                 if r['utype'] == 'admin':
-                    QOS_RECIPIENTS.append((r['firstname'],r['email']))
+                    QOS_RECIPIENTS.append((r['firstname'], r['email']))
                 else:
                     if 'ACTIVATE_MANAGERS' in SETTINGS:
                         if SETTINGS['ACTIVATE_MANAGERS'] == 'true':
-                            QOS_RECIPIENTS.append((r['firstname'],r['email']))
+                            QOS_RECIPIENTS.append((r['firstname'], r['email']))
         QOS_RECIPIENTS = list(set(QOS_RECIPIENTS))
+
     def get_templates(self):
         global TEMPLATES
-        res =  self.db.query('SELECT name, en_txt, fr_txt FROM templates')
+        res = self.db.query('SELECT name, en_txt, fr_txt FROM templates')
         if res:
             for template in res:
-                TEMPLATES['%s'%template['name']] = template['%s'%('%s_txt'%getattr(SETTINGS,'LANGUAGE','en'))]
+                TEMPLATES['%s' % template['name']] = template['%s' % ('%s_txt' % getattr(SETTINGS, 'LANGUAGE', 'en'))]
 
 # Load Settings from DB
 Settings(db)
 
-def sendsms(frm, to, msg,smsc):
+
+def sendsms(frm, to, msg, smsc):
     """sends the sms"""
-    params = {'from':frm,'to':to,'text':msg,'smsc':smsc}
+    params = {'from': frm, 'to': to, 'text': msg, 'smsc': smsc}
     surl = SETTINGS['SENDSMS_URL']
     if surl.find('?'):
         c = '&'
-    else: c = '?'
+    else:
+        c = '?'
     url = surl + c + urlencode(params)
     try:
         s = urlopen(url)
@@ -205,51 +223,63 @@ def sendsms(frm, to, msg,smsc):
     return ret[:]
 
 # Logs Sent Message to out message table
+
+
 def update_field(dbconn, dic):
     query = ("UPDATE %(table)s SET %(col)s ='%(val)s' WHERE %(idfield)s = '%(idvalue)s'")
     dbconn.query(query % dic)
 
+
 def update_fields(dic):
     #dic = lit(table='gwe', update_dict=lit(field1=4, field2='9'), where_dict=lit(id=1))
-    set_str = ', '.join(["%s = %r"%(i[0],i[1]) for i in dic['update_dict'].items()])
-    where_str = ' AND '.join(["%s = %r"%(i[0],i[1]) for i in dic['where_dict'].items()])
-    query = "UPDATE %s SET %s WHERE %s"%(dic['table'],set_str, where_str)
+    set_str = ', '.join(["%s = %r" % (i[0], i[1]) for i in dic['update_dict'].items()])
+    where_str = ' AND '.join(["%s = %r" % (i[0], i[1]) for i in dic['where_dict'].items()])
+    query = "UPDATE %s SET %s WHERE %s" % (dic['table'], set_str, where_str)
     return query
 
-def log_message(dbconn,msg_dict):
-    """Log sent message to messages table"""
-    dbconn.insert('messages',backend_id=msg_dict['backend_id'], msg_out=msg_dict['msg_out'],
-            status_out=msg_dict['status_out'], destination=msg_dict['destination'])
 
-def log_to_stats_matrix(dbconn,msg_dict):
-    query = ("SELECT id FROM statistics WHERE idate='%(idate)s' AND backend_id=%(backend_id)s "
-            "AND destination='%(destination)s'")
+def log_message(dbconn, msg_dict):
+    """Log sent message to messages table"""
+    dbconn.insert(
+        'messages', backend_id=msg_dict['backend_id'], msg_out=msg_dict['msg_out'],
+        status_out=msg_dict['status_out'], destination=msg_dict['destination'])
+
+
+def log_to_stats_matrix(dbconn, msg_dict):
+    query = (
+        "SELECT id FROM statistics WHERE idate='%(idate)s' AND backend_id=%(backend_id)s "
+        "AND destination='%(destination)s'")
     r = dbconn.query(query % msg_dict)
     if r:
         idx = r[0]['id']
-        db.query("UPDATE statistics SET sent_count= sent_count + 1 WHERE id = %s"%idx)
+        db.query("UPDATE statistics SET sent_count= sent_count + 1 WHERE id = %s" % idx)
     else:
-        dbconn.insert('statistics', idate=msg_dict['idate'], backend_id=msg_dict['backend_id'],
-                destination=msg_dict['destination'])
+        dbconn.insert(
+            'statistics', idate=msg_dict['idate'], backend_id=msg_dict['backend_id'],
+            destination=msg_dict['destination'])
+
 
 def send_email(_from, recipient, subject, msg):
     """Sends email"""
-    web.sendmail(_from,recipient, subject, msg)
+    web.sendmail(_from, recipient, subject, msg)
+
 
 def SendModemAvailabilityAlert(modem_smscname):
     """used to send mail if modem is not onlile"""
     subject = 'QOS Modem Alert'
     for name, email in MODEM_STATUS_RECIPIENTS:
-        msg = 'Hello %s,\nThe %s is not on-line!\n\nRegards,\nJenifer'%(name, modem_smscname)
+        msg = 'Hello %s,\nThe %s is not on-line!\n\nRegards,\nJenifer' % (name, modem_smscname)
         send_email(SETTINGS['DEFAULT_EMAIL_SENDER'], email, subject, msg)
+
 
 def get_qos_time_offset():
     qos_interval = QOS_INTERVAL
-    time_offset = datetime.now() - timedelta(hours=qos_interval['hours'],
-                    minutes=(qos_interval['minutes'] + qos_interval['offset']))
+    time_offset = datetime.now() - \
+        timedelta(hours=qos_interval['hours'], minutes=(qos_interval['minutes'] + qos_interval['offset']))
     return time_offset
 
-def get_backendlist(l,ret_strlist=True):
+
+def get_backendlist(l, ret_strlist=True):
     """return list to pass to IN in an SQL query. Eg [1,2,3] returns 1,2,3"""
     t = ''
     for i in l:
@@ -260,29 +290,31 @@ def get_backendlist(l,ret_strlist=True):
     return t[:-1]
 
 #Page Handlers
+
+
 class HandleReceivedQosMessage:
     """This is what Kannel get-url calls"""
     def GET(self):
         params = web.input(
-                sender='',
-                receiver='',
-                backend='',
-                message=''
-                )
-        web.header("Content-Type","text/plain; charset=utf-8");
+            sender='',
+            receiver='',
+            backend='',
+            message=''
+        )
+        web.header("Content-Type", "text/plain; charset=utf-8")
         x = GetBackends(db, 's', True)
         shortcode_backends = x.get()
         shortcodes = [s['identity'] for s in shortcode_backends]
-        params.sender = params.sender.replace('+','')
+        params.sender = params.sender.replace('+', '')
         if params.sender.lower() not in shortcodes:
             return "Ignored, black listed sender!"
         msg = params.message.strip()
         if not re.match(r'^\d{4}-\d{2}-\d{2}\s\d{2}', msg):
             return "Message not in format we want!"
         # Now log message to DB in msg_in
-        modems  = GetBackends(db, 'm' ,True).get()
+        modems = GetBackends(db, 'm', True).get()
         modem_numbers = [m['identity'] for m in GetBackends(db, 'm', True).get()]
-        params.receiver = params.receiver.replace('+','')
+        params.receiver = params.receiver.replace('+', '')
         if params.receiver not in modem_numbers:
             return "Message Ingnored, receiver not one of our modem numbers! (%s)" % params.receiver
         backend_id = [b['id'] for b in modems if b['smsc_name'] == params.backend][0]
@@ -294,9 +326,10 @@ class HandleReceivedQosMessage:
             resp_str = ' server_response_date = NULL '
             msg_in = msg
         with db.transaction():
-            query = ("UPDATE messages SET ldate = '%s', msg_in='%s', %s "
-                    " WHERE msg_out='%s' AND backend_id = %s AND destination = '%s' "
-                    "RETURNING round((EXTRACT(EPOCH FROM ldate - cdate))::numeric,3) AS diff, cdate::date as xdate")
+            query = (
+                "UPDATE messages SET ldate = '%s', msg_in='%s', %s "
+                " WHERE msg_out='%s' AND backend_id = %s AND destination = '%s' "
+                "RETURNING round((EXTRACT(EPOCH FROM ldate - cdate))::numeric,3) AS diff, cdate::date as xdate")
             query = query % (datetime.now(), msg_in, resp_str, msg_in, backend_id, params.sender)
             res = db.query(query)
             #db.update('messages', msg_in=msg_in, ldate=datetime.now(),
@@ -306,38 +339,42 @@ class HandleReceivedQosMessage:
                 r = res[0]
                 delay = r['diff']
                 idate = r['xdate']
-                query = ("UPDATE statistics SET receive_count=receive_count +1, "
-                        "delay_matrix = array_append(delay_matrix, %s) "
-                        "WHERE idate='%s' AND backend_id=%s AND destination='%s'")
-                db.query(query % (delay, idate,backend_id,params.sender))
-            logging.debug("[%s] Received SMS [SMSC: %s] [from: %s] [to: %s] [msg: %s]"%('/qos',
-                params.backend, params.sender, params.receiver, msg))
+                query = (
+                    "UPDATE statistics SET receive_count=receive_count +1, "
+                    "delay_matrix = array_append(delay_matrix, %s) "
+                    "WHERE idate='%s' AND backend_id=%s AND destination='%s'")
+                db.query(query % (delay, idate, backend_id, params.sender))
+            logging.debug(
+                "[%s] Received SMS [SMSC: %s] [from: %s] [to: %s] [msg: %s]" %
+                ('/qos', params.backend, params.sender, params.receiver, msg))
         return "Done!"
+
 
 class HandleDlr:
     """handles DLRs"""
     def GET(self):
         params = web.input(
-                source='',
-                destination='',
-                message='',
-                dlrvalue=''
-                )
-        web.header("Content-Type","text/plain; charset=utf-8");
+            source='',
+            destination='',
+            message='',
+            dlrvalue=''
+        )
+        web.header("Content-Type", "text/plain; charset=utf-8")
         return "It works!"
+
 
 class SendQosMessages:
     """Sends the QOS messages"""
     def GET(self):
         params = web.input()
-        web.header("Content-Type","text/plain; charset=utf-8");
-        x = GetBackends(db,'s',True)
+        web.header("Content-Type", "text/plain; charset=utf-8")
+        x = GetBackends(db, 's', True)
         shortcode_backends = x.get()
-        applied_modems = [] # for logging
+        applied_modems = []  # for logging
         failed_modems = []
-        logging.debug("[%s] Started Sending QOS Messages"%('/send'))
+        logging.debug("[%s] Started Sending QOS Messages" % ('/send'))
         testing_time = datetime.now().strftime('%H:%M%p %h %d, %Y')
-        rpt_subject = "%s: %s"%(TEMPLATES['QOS_SEND_SUBJ'],datetime.now().strftime('%Y-%m-%d %H'))
+        rpt_subject = "%s: %s" % (TEMPLATES['QOS_SEND_SUBJ'], datetime.now().strftime('%Y-%m-%d %H'))
         rpt_body = TEMPLATES['QOS_SEND_BODY_LINIE1']
         rpt_body += TEMPLATES['QOS_SEND_BODY_LINIE2']
         for shortcode in shortcode_backends:
@@ -356,63 +393,67 @@ class SendQosMessages:
                 smsc = modem['smsc_name']
                 applied_modems.append(smsc)
                 res = sendsms(_from, to, msg, smsc)
-                if isinstance(res,list):
+                if isinstance(res, list):
                     res = ' '.join(res)
-                if res.find('Accept') <> -1:
+                if res.find('Accept') != -1:
                     status = 'S'
                     #best place to record statistics
-                    dic = lit(idate=datetime.now().strftime('%Y-%m-%d'), backend_id=modem['id'],destination=shortcode['identity'],)
-                    log_to_stats_matrix(db,dic)
-                elif res.find('Error') <> -1:
+                    dic = lit(idate=datetime.now().strftime('%Y-%m-%d'), backend_id=modem['id'], destination=shortcode['identity'])
+                    log_to_stats_matrix(db, dic)
+                elif res.find('Error') != -1:
                     status = 'E'
                 else:
                     status = 'Q'
                 if status == 'E':
-                    email_body = 'Hi,\nError sending from %s to %s.\n\nRegards,\nJennifer'%(modem['name'],shortcode['identity'])
-                    send_email(SETTINGS['DEFAULT_EMAIL_SENDER'], 'sekiskylink@gmail.com', "Send SMS Error",email_body)
-                rpt_body += TEMPLATES['QOS_SEND_INNER_BODY'] %(modem['name'], modem['identity'],
-                        ' '*(32-(len(modem['name']+ modem['identity'])+2)),shortcode['identity'])
+                    email_body = 'Hi,\nError sending from %s to %s.\n\nRegards,\nJennifer' % (modem['name'], shortcode['identity'])
+                    send_email(SETTINGS['DEFAULT_EMAIL_SENDER'], 'sekiskylink@gmail.com', "Send SMS Error", email_body)
+                rpt_body += TEMPLATES['QOS_SEND_INNER_BODY'] % (
+                    modem['name'], modem['identity'],
+                    ' ' * (32 - (len(modem['name'] + modem['identity']) + 2)), shortcode['identity'])
                 #create log message dict
                 backend_id = modem['id']
                 log_message_dict = {
-                        'backend_id':backend_id,
-                        'msg_out':msg,
-                        'destination':shortcode['identity'],
-                        'status_out':status
-                        }
+                    'backend_id': backend_id,
+                    'msg_out': msg,
+                    'destination': shortcode['identity'],
+                    'status_out': status
+                }
                 with db.transaction():
                     log_message(db, log_message_dict)
-                logging.debug("[%s] Sent SMS [SMSC: %s] [from: %s] [to: %s] [msg: %s]"%('/send',
-                    modem['smsc_name'], modem['identity'], shortcode['identity'], msg))
-        logging.debug("[%s] Sent QOS messages using %s: Failed = %s"%('/send', list(set(applied_modems)), list(set(failed_modems))))
-        rpt_body += "\n%s %s\n"%(TEMPLATES['QOS_TIME_LINE'],testing_time) + TEMPLATES['QOS_FOOTER']
-        send_email(SETTINGS['DEFAULT_EMAIL_SENDER'], [email for name,email in QOS_RECIPIENTS], rpt_subject, rpt_body)
+                logging.debug(
+                    "[%s] Sent SMS [SMSC: %s] [from: %s] [to: %s] [msg: %s]" % (
+                        '/send', modem['smsc_name'], modem['identity'], shortcode['identity'], msg))
+        logging.debug("[%s] Sent QOS messages using %s: Failed = %s" % ('/send', list(set(applied_modems)), list(set(failed_modems))))
+        rpt_body += "\n%s %s\n" % (TEMPLATES['QOS_TIME_LINE'], testing_time) + TEMPLATES['QOS_FOOTER']
+        send_email(SETTINGS['DEFAULT_EMAIL_SENDER'], [email for name, email in QOS_RECIPIENTS], rpt_subject, rpt_body)
         return "Done!"
+
 
 class MonitorQosMessages:
     """Used to monitor sent QOS messages. did recipient receive and respond?"""
     def GET(self):
         params = web.input()
-        web.header("Content-Type","text/plain; charset=utf-8");
-        x = GetBackends(db,'s',True)
+        web.header("Content-Type", "text/plain; charset=utf-8")
+        x = GetBackends(db, 's', True)
         shortcode_backends = x.get()
         time_offset = get_qos_time_offset()
         testing_time = datetime.now().strftime('%H:%M%p %h %d, %Y')
-        logging.debug("[%s] Started Mornitoring"%('/monitor'))
-        rpt_subject = "%s %s"%(TEMPLATES['QOS_RECV_ALL_SUBJ'],datetime.now().strftime('%Y-%m-%d %H'))
+        logging.debug("[%s] Started Mornitoring" % ('/monitor'))
+        rpt_subject = "%s %s" % (TEMPLATES['QOS_RECV_ALL_SUBJ'], datetime.now().strftime('%Y-%m-%d %H'))
         rpt_body = TEMPLATES['QOS_RECV_BODY_LINE1']
         rpt_body += TEMPLATES['QOS_RECV_BODY_LINE2']
         rpt_body2 = ""
         subject = TEMPLATES['QOS_ALARM_SUBJ'] % time.strftime('%F %H')
         monitor_msg = ('Hello %s,\nJenifer didn\'t get a reply for the following networks:\n')
-        monitor_msg +=("----------------------------------------------------\n")
+        monitor_msg += ("----------------------------------------------------\n")
         there_is_an_alert = False
         for shortcode in shortcode_backends:
             y = GetAllowedModems(db, shortcode['id'])
             allowed_modems = y.get()
             for modem in allowed_modems:
-                t_query = ("SELECT id FROM messages WHERE cdate > '%s' AND msg_out = msg_in AND msg_out <> '' "
-                            " AND backend_id = %s AND destination = '%s'")
+                t_query = (
+                    "SELECT id FROM messages WHERE cdate > '%s' AND msg_out = msg_in AND msg_out <> '' "
+                    " AND backend_id = %s AND destination = '%s'")
                 query = t_query % (time_offset, modem['id'], shortcode['identity'])
                 res = db.query(query)
                 #check if message was previously sent successfully from modem
@@ -422,23 +463,27 @@ class MonitorQosMessages:
                 if not res:
                     if res_sent:
                         there_is_an_alert = True
-                        monitor_msg += TEMPLATES['QOS_ALARM_INNER_BODY'] %(modem['name']+(' '*(9-len(modem['name']))), shortcode['identity'], shortcode['smsc_name'])
-                        logging.warning("[%s] No response from %s for %s"%('/monitor', shortcode['identity'], modem['name']))
+                        monitor_msg += TEMPLATES['QOS_ALARM_INNER_BODY'] % (
+                            modem['name'] + (' ' * (9 - len(modem['name']))),
+                            shortcode['identity'], shortcode['smsc_name'])
+                        logging.warning("[%s] No response from %s for %s" % ('/monitor', shortcode['identity'], modem['name']))
                     else:
                         # modem was down
                         pass
                 else:
-                    rpt_body2 += TEMPLATES['QOS_ALARM_INNER_BODY'] %(modem['name'], shortcode['identity'],shortcode['smsc_name'])
+                    rpt_body2 += TEMPLATES['QOS_ALARM_INNER_BODY'] % (
+                        modem['name'], shortcode['identity'], shortcode['smsc_name'])
 
         if there_is_an_alert:
             for name, recipient in QOS_RECIPIENTS:
-                the_msg = (monitor_msg % name) + "\n%s %s\n"%(TEMPLATES['QOS_TIME_LINE'],testing_time) + TEMPLATES['QOS_FOOTER']
-                send_email(SETTINGS['DEFAULT_EMAIL_SENDER'],recipient, subject, the_msg)
+                the_msg = (monitor_msg % name) + "\n%s %s\n" % (TEMPLATES['QOS_TIME_LINE'], testing_time) + TEMPLATES['QOS_FOOTER']
+                send_email(SETTINGS['DEFAULT_EMAIL_SENDER'], recipient, subject, the_msg)
         else:
-            rpt_body += rpt_body2 + "\n%s %s\n"%(TEMPLATES['QOS_TIME_LINE'],testing_time) + TEMPLATES['QOS_FOOTER']
-            send_email(SETTINGS['DEFAULT_EMAIL_SENDER'], [email for name,email in QOS_RECIPIENTS], rpt_subject, rpt_body)
-        logging.debug("[%s] Stopped Mornitoring"%('/monitor'))
+            rpt_body += rpt_body2 + "\n%s %s\n" % (TEMPLATES['QOS_TIME_LINE'], testing_time) + TEMPLATES['QOS_FOOTER']
+            send_email(SETTINGS['DEFAULT_EMAIL_SENDER'], [email for name, email in QOS_RECIPIENTS], rpt_subject, rpt_body)
+        logging.debug("[%s] Stopped Mornitoring" % ('/monitor'))
         return "Done!"
+
 
 class CheckModems:
     """Checks Kannel status of all modems"""
@@ -447,7 +492,7 @@ class CheckModems:
             f = urllib.urlopen(SETTINGS['KANNEL_STATUS_URL'])
             x = f.readlines()
         except IOError, (instance):
-            logging.debug("[%s] Checked status: perhaps kannel is down!"%('/check'))
+            logging.debug("[%s] Checked status: perhaps kannel is down!" % ('/check'))
             return "Kannel is likely to be down!"
         p = x[:]
 
@@ -461,18 +506,19 @@ class CheckModems:
             if not l.strip():
                 continue
             for smsc in smscs:
-                pattern = re.compile(r'%s'%smsc)
+                pattern = re.compile(r'%s' % smsc)
                 if pattern.match(l.strip()):
-                    status = l.strip().split()[2].replace('(','')
-                    toret += "%s is %s\n"%(smsc, status)
+                    status = l.strip().split()[2].replace('(', '')
+                    toret += "%s is %s\n" % (smsc, status)
                     res[smsc] = status
-        logging.debug("[%s] Checked status for %s"%('/check', smscs))
+        logging.debug("[%s] Checked status for %s" % ('/check', smscs))
         return render.status(res=res)
         #return toret
 
+
 class DisableEnableBackend:
     """Disable or enable a given backend"""
-    def get_backendlist(self,l):
+    def get_backendlist(self, l):
         t = ''
         for i in l:
             t += "\'%s\'," % (i)
@@ -480,36 +526,38 @@ class DisableEnableBackend:
 
     def GET(self):
         params = web.input(
-                backend_list='',
-                username='',
-                passwd='',
-                action='disable'
-                )
-        web.header("Content-Type","text/plain; charset=utf-8");
+            backend_list='',
+            username='',
+            passwd='',
+            action='disable'
+        )
+        web.header("Content-Type", "text/plain; charset=utf-8")
         backend_list = params.backend_list
         if not backend_list:
             web.ctx.status = '400 Bad Request'
             return "No Backends Specified for enabling/disabling!"
         if params.action not in ['disable', 'enable']:
             web.ctx.status = '400 Bad Request'
-            return "Unknown action %s passed as parameter"%params.action
+            return "Unknown action %s passed as parameter" % params.action
         backend_list = backend_list.split(',')
         t_query = ("UPDATE backends SET active = %s WHERE smsc_name IN (%s)")
-        query = t_query % (False if params.action=='disable' else True,self.get_backendlist(backend_list))
+        query = t_query % (False if params.action == 'disable' else True, self.get_backendlist(backend_list))
         db.query(query)
-        resp = ', '.join(backend_list) + " successfully %s"%('disabled' if params.action == 'disable' else 'enabled')
-        logging.debug('[%s] %s the following backends: %s '%('/manage',
-            'disabled' if params.action == 'disable' else 'enabled', backend_list))
+        resp = ', '.join(backend_list) + " successfully %s" % ('disabled' if params.action == 'disable' else 'enabled')
+        logging.debug(
+            '[%s] %s the following backends: %s ' %
+            ('/manage', 'disabled' if params.action == 'disable' else 'enabled', backend_list))
         return resp
+
 
 class ManageShortcode:
     """Sets enabled list of modems for a given shortcode"""
     def GET(self):
         params = web.input(
-                shortcode_name = '',
-                modem_list='',
-                )
-        web.header("Content-Type","text/plain; charset=utf-8");
+            shortcode_name='',
+            modem_list='',
+        )
+        web.header("Content-Type", "text/plain; charset=utf-8")
         shortcode_name = params.shortcode_name
         modem_list = params.modem_list
 
@@ -521,7 +569,7 @@ class ManageShortcode:
             return "No Shortcode specifies, please pass required parameter: shortcode_name"
 
         modem_list = modem_list.split(',')
-        res = db.query("SELECT id FROM backends WHERE name IN (%s)" % get_backendlist(modem_list,True))
+        res = db.query("SELECT id FROM backends WHERE name IN (%s)" % get_backendlist(modem_list, True))
         if not res:
             web.ctx.status = '400 Bad Request'
             return "Specified modem(s) %s not in our list of modems" % modem_list
@@ -533,10 +581,11 @@ class ManageShortcode:
             return "Unknown Shortcode name %s" % shortcode_name
         modem_ids = [i['id'] for i in res]
         t_query = ("UPDATE shortcode_allowed_modems SET allowedlist = ARRAY[%s] WHERE shortcode_id = %s")
-        db.query(t_query % (get_backendlist(modem_ids,False),shortcode_id))
-        resp = ', '.join(modem_list) + " successfully set as allowed modems for %s"%(shortcode_name)
-        logging.debug('[%s] set [%s] as allowed modems for [%s] '%('/manage_shortcode', ', '.join(modem_list), shortcode_name))
+        db.query(t_query % (get_backendlist(modem_ids, False), shortcode_id))
+        resp = ', '.join(modem_list) + " successfully set as allowed modems for %s" % (shortcode_name)
+        logging.debug('[%s] set [%s] as allowed modems for [%s] ' % ('/manage_shortcode', ', '.join(modem_list), shortcode_name))
         return "Done!"
+
 
 class Info:
     """To return some info about system"""
@@ -544,18 +593,20 @@ class Info:
         return "Not yet Implemented!"
 
 # Consider doing webpy nose testing!!
+
+
 class Test:
     """Used for Testing"""
     def GET(self):
         params = web.input()
-        web.header("Content-Type","text/plain; charset=utf-8");
-        x = GetBackends(db,'s',True)
+        web.header("Content-Type", "text/plain; charset=utf-8")
+        x = GetBackends(db, 's', True)
         shortcode_backends = x.get()
-        y = GetAllowedModems(db,2)
+        #y = GetAllowedModems(db, 2)
         #SendModemAvailabilityAlert('mtn-modem')
 
-        modems  = GetBackends(db,'m',True).get()
-        backend_id = [b['id'] for b in modems if b['name'] == 'mtn-modem']
+        #modems = GetBackends(db, 'm', True).get()
+        #backend_id = [b['id'] for b in modems if b['name'] == 'mtn-modem']
         #log_message_dict = {
         #        'backend_id':backend_id[0],
         #        'msg_out':'2012-03-18 04',
@@ -568,49 +619,62 @@ class Test:
 
         return "It works!!"
 
+
 class MessageLog(object):
     pass
+
+
 class JenniferLog:
     def GET(self):
         s = os.popen("tail -n 30 /var/log/jennifer/jennifer.log")
         logs = s.readlines()
-        l = locals(); del l['self']
+        l = locals()
+        del l['self']
         return render.log(**l)
+
 
 class Stats:
     def GET(self):
-        l = locals(); del l['self']
+        l = locals()
+        del l['self']
         return render.stats(**l)
+
 
 class Reports:
     def GET(self):
         params = web.input(page=1)
         try:
             page = int(params.page)
-        except: page = 1
+        except:
+            page = 1
 
         limit = SETTINGS['PAGE_LIMIT']
-        start = (page -1) * limit if page > 0 else 0
+        start = (page - 1) * limit if page > 0 else 0
 
-        dic = lit(relations='message_view', fields="*", criteria="", limit=limit,offset=start)
-        res = doquery(db,dic)
+        dic = lit(relations='message_view', fields="*", criteria="", order="msg_out desc, recipient", limit=limit, offset=start)
+        res = doquery(db, dic)
         count = countquery(db, dic)
-        pagination_str = getPaginationString(default(page,0),count,limit,2,"reports","?page=")
+        pagination_str = getPaginationString(default(page, 0), count, limit, 2, "reports", "?page=")
 
-        l = locals(); del l['self']
+        l = locals()
+        del l['self']
         return render.reports(**l)
+
 
 class Admin:
     def GET(self):
         params = web.input(page=1, ed="", d_id="")
-        firstname,lastname,email,enabled, utype = ("", "", "", False, "")
+        firstname, lastname, email, enabled, utype = ("", "", "", False, "")
 
         if params.ed:
             pass
-            r = db.query("SELECT * FROM users WHERE id = %s"% params.ed)
+            r = db.query("SELECT * FROM users WHERE id = %s" % params.ed)
             if r:
                 rx = r[0]
-                firstname=rx.firstname; lastname=rx.lastname; email=rx.email; enabled=rx.active
+                firstname = rx.firstname
+                lastname = rx.lastname
+                email = rx.email
+                enabled = rx.active
                 utype = rx.utype
             del r
         if params.d_id:
@@ -618,30 +682,42 @@ class Admin:
 
         try:
             page = int(params.page)
-        except: page = 1
+        except:
+            page = 1
 
         limit = SETTINGS['PAGE_LIMIT']
-        start = (page -1) * limit if page > 0 else 0
+        start = (page - 1) * limit if page > 0 else 0
 
-        dic = lit(relations='users', fields="*", criteria="", order="firstname, lastname", limit=limit,offset=start)
-        res = doquery(db,dic)
+        dic = lit(relations='users', fields="*", criteria="", order="firstname, lastname", limit=limit, offset=start)
+        res = doquery(db, dic)
         count = countquery(db, dic)
-        pagination_str = getPaginationString(default(page,0),count,limit,2,"users","?page=")
-        l = locals(); del l['self']
+        pagination_str = getPaginationString(default(page, 0), count, limit, 2, "users", "?page=")
+        l = locals()
+        del l['self']
         return render.users(**l)
 
     def POST(self):
-        params = web.input(page=1, ed="", d_id="",
-                firstname="", lastname="", email="", enabled=False, utype="")
-        firstname,lastname,email,enabled, utype = ("", "", "", False, "")
+        params = web.input(
+            page=1,
+            ed="",
+            d_id="",
+            firstname="",
+            lastname="",
+            email="",
+            enabled=False,
+            utype=""
+        )
+        firstname, lastname, email, enabled, utype = ("", "", "", False, "")
 
         with db.transaction():
             active = True if params.enabled == "on" else False
             if params.ed:
-                update_sql = ("UPDATE users SET firstname='%s', lastname='%s', email = '%s', "
-                            " utype='%s', active = %s WHERE id = %s ")
-                update_sql = update_sql % (params.firstname, params.lastname, params.email,
-                        params.utype, active, params.ed)
+                update_sql = (
+                    "UPDATE users SET firstname='%s', lastname='%s', email = '%s', "
+                    " utype='%s', active = %s WHERE id = %s ")
+                update_sql = update_sql % (
+                    params.firstname, params.lastname, params.email,
+                    params.utype, active, params.ed)
                 db.query(update_sql)
             elif not params.ed and not params.d_id:
                 #we're inserting
@@ -649,17 +725,20 @@ class Admin:
 
         try:
             page = int(params.page)
-        except: page = 1
+        except:
+            page = 1
         limit = SETTINGS['PAGE_LIMIT']
-        start = (page -1) * limit if page > 0 else 0
+        start = (page - 1) * limit if page > 0 else 0
 
-        dic = lit(relations='users', fields="*", criteria="", order="firstname, lastname", limit=limit,offset=start)
-        res = doquery(db,dic)
+        dic = lit(relations='users', fields="*", criteria="", order="firstname, lastname", limit=limit, offset=start)
+        res = doquery(db, dic)
         count = countquery(db, dic)
-        pagination_str = getPaginationString(default(page,0),count,limit,2,"users","?page=")
+        pagination_str = getPaginationString(default(page, 0), count, limit, 2, "users", "?page=")
 
-        l = locals(); del l['self']
+        l = locals()
+        del l['self']
         return render.users(**l)
+
 
 class Data:
     """
@@ -677,11 +756,12 @@ class Data:
         params = web.input(network="UTL")
         data = {}
         if params.network:
-            rs = db.query("select a.identity from backends a, shortcode_allowed_modems b "
-                        " where b.shortcode_id = a.id AND (select id from backends where name "
-                        "= '%s') = any(b.allowedlist)" % params.network)
+            rs = db.query(
+                "select a.identity from backends a, shortcode_allowed_modems b "
+                " where b.shortcode_id = a.id AND (select id from backends where name "
+                "= '%s') = any(b.allowedlist)" % params.network)
             for r in rs:
-                data['%s-%s' % (params.network, r.identity)]=['0', '0', '0', '0', '0', '0']
+                data['%s-%s' % (params.network, r.identity)] = ['0', '0', '0', '0', '0', '0']
 
             count_per_hour = len(data.keys())
 
@@ -690,17 +770,18 @@ class Data:
             categories = []
             #if now.minute >= 1:
             t = now
-            for i in range(6): # we can make this 6 configurable
+            for i in range(6):  # we can make this 6 configurable
                 categories.append(t.strftime('%Y-%m-%d %H'))
                 t = t - timedelta(hours=1)
             categories.reverse()
             #print categories
             category_list = 'Categories,' + ','.join(categories) + "\n"
             #print category_list
-            rs = db.query("select * FROM rtt_view WHERE backend = "
-                    "'%s' and cdate > '%s:00' ORDER BY cdate ASC LIMIT %s" % (params.network,
-                        categories[0], (6 * count_per_hour)))
-            for  r in rs:
+            rs = db.query(
+                "select * FROM rtt_view WHERE backend = "
+                "'%s' and cdate > '%s:00' ORDER BY cdate ASC LIMIT %s" % (
+                    params.network, categories[0], (6 * count_per_hour)))
+            for r in rs:
                 if r.msg_out in categories:
                     idx = categories.index(r.msg_out)
                     data['%s-%s' % (params.network, r.destination)][idx] = '%s' % r.rtt_time
@@ -710,7 +791,7 @@ class Data:
         return category_list
 
 if __name__ == "__main__":
-      app.run()
+    app.run()
 
 #makes sure apache wsgi sees our app
 application = web.application(urls, globals()).wsgifunc()
