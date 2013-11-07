@@ -8,10 +8,9 @@ import urllib
 import logging
 import re
 import time
+import requests
 from datetime import datetime
 from datetime import timedelta
-from urllib import urlencode
-from urllib import urlopen
 from web.contrib.template import render_mako
 
 filedir = os.path.dirname(__file__)
@@ -206,21 +205,12 @@ Settings(db)
 
 
 def sendsms(frm, to, msg, smsc):
-    """sends the sms"""
     params = {'from': frm, 'to': to, 'text': msg, 'smsc': smsc}
     surl = SETTINGS['SENDSMS_URL']
-    if surl.find('?'):
-        c = '&'
-    else:
-        c = '?'
-    url = surl + c + urlencode(params)
-    try:
-        s = urlopen(url)
-        ret = s.readlines()
-    except IOError, (instance):
-        ret = "Error."
-    return ret[:]
-
+    res = requests.get(surl, params=params)
+    if res.status_code in (requests.codes.ok, requests.codes.ACCEPTED):
+        return res.text
+    return "Error"
 # Logs Sent Message to out message table
 
 
@@ -392,8 +382,6 @@ class SendQosMessages:
                 smsc = modem['smsc_name']
                 applied_modems.append(smsc)
                 res = sendsms(_from, to, msg, smsc)
-                if isinstance(res, list):
-                    res = ' '.join(res)
                 if res.find('Accept') != -1:
                     status = 'S'
                     #best place to record statistics
