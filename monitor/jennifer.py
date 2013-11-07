@@ -38,7 +38,7 @@ logging.basicConfig(
 
 #DB confs
 db_host = 'localhost'
-db_name = 'jennifer2'
+db_name = 'jennifer'
 db_user = 'postgres'
 db_passwd = 'postgres'
 
